@@ -12,6 +12,12 @@ A production-ready AI chatbot built with **Azure OpenAI**, **Gradio**, and the *
 ![Chatbot Interface](screenshots/interface2.png)
 ---
 
+```
+wsl -d Ubuntu
+source .venv/bin/activate
+python app.py
+```
+
 ## ✨ Features
 
 ### 🎯 Core Capabilities
