@@ -42,7 +42,7 @@ numpy==2.2.6
 openai==2.15.0
 orjson==3.11.5
 packaging==25.0
-pandas==2.3.3
+pandas==2.3.0
 pillow==12.1.0
 propcache==0.4.1
 pycparser==2.23
@@ -52,6 +52,7 @@ pydantic_core==2.41.5
 pydub==0.25.1
 Pygments==2.19.2
 PyJWT==2.10.1
+pypdf>=4.0.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 python-multipart==0.0.21
