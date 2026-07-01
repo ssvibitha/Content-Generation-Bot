@@ -282,28 +282,43 @@ def remove_file_by_index(index_json: str) -> tuple:
 
 
 # ---------------------------------------------------------------------------
-# CSS  — modern, clean, light workspace theme
+# CSS  — modern, clean, neutral workspace theme (light + dark)
 # ---------------------------------------------------------------------------
-# Token system
-#   Surface   #FFFFFF   Canvas    #F5F6FA   Border   #E6E8F0
-#   Text hi   #12131A   Text lo   #6B7280   Accent   #4338CA (indigo)
-#   Accent soft #EEF0FE  Success  #0F9D58   Warning  #B7791F   Danger #D92D20
+# Token system — all grey/neutral, no color accent
+#   Light: Canvas #F6F6F7  Surface #FFFFFF  Border #E4E4E7  Text hi #18181B  Text lo #6B6F76
+#   Dark:  Canvas #1B1B1E  Surface #232326  Border #38383D  Text hi #F2F2F3  Text lo #9A9AA1
+#   Accent is a neutral charcoal/light-grey (theme-aware), not a hue.
 #   Display face: 'Manrope' (headings/labels) · Body/UI face: 'Inter'
 
 _CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-    --canvas: #F5F6FA;
+    --canvas: #F6F6F7;
     --surface: #FFFFFF;
-    --border: #E6E8F0;
-    --text-hi: #12131A;
-    --text-lo: #6B7280;
-    --accent: #4338CA;
-    --accent-soft: #EEF0FE;
-    --success: #0F9D58;
-    --warning: #B7791F;
-    --danger: #D92D20;
+    --border: #E4E4E7;
+    --text-hi: #18181B;
+    --text-lo: #6B6F76;
+    --accent: #3F3F46;
+    --accent-fg: #FFFFFF;
+    --accent-soft: #EFEFF1;
+    --success: #178653;
+    --warning: #9A6700;
+    --danger: #C0362C;
+}
+
+.dark {
+    --canvas: #1B1B1E;
+    --surface: #232326;
+    --border: #38383D;
+    --text-hi: #F2F2F3;
+    --text-lo: #9A9AA1;
+    --accent: #D4D4D8;
+    --accent-fg: #18181B;
+    --accent-soft: #2E2E33;
+    --success: #34D399;
+    --warning: #F5B94D;
+    --danger: #F87171;
 }
 
 * { box-sizing: border-box; }
@@ -379,7 +394,7 @@ _CSS = """
     margin-bottom: 6px;
     font-weight: 700;
 }
-.empty-panel-sub { color: #9CA3AF; font-size: 0.76rem; }
+.empty-panel-sub { color: var(--text-lo); font-size: 0.76rem; opacity: 0.8; }
 .empty-panel.error { color: var(--danger); }
 
 /* ── Files sidebar ── */
@@ -431,7 +446,7 @@ _CSS = """
 .file-remove-btn {
     background: transparent;
     border: none;
-    color: #B0B4C0;
+    color: var(--text-lo);
     border-radius: 6px;
     width: 22px;
     height: 22px;
@@ -445,7 +460,7 @@ _CSS = """
     transition: background 0.15s, color 0.15s;
 }
 .file-remove-btn:hover {
-    background: #FEE4E2;
+    background: var(--accent-soft);
     color: var(--danger);
 }
 
@@ -503,7 +518,7 @@ _CSS = """
     transition: background 0.15s !important;
     line-height: 1 !important;
 }
-.upload-plus-btn button:hover { background: #E0E4FC !important; }
+.upload-plus-btn button:hover { background: var(--border) !important; }
 
 /* Text input inside bar */
 .chat-input textarea {
@@ -518,7 +533,7 @@ _CSS = """
     min-height: 40px !important;
     max-height: 120px !important;
 }
-.chat-input textarea::placeholder { color: #A3A7B5 !important; }
+.chat-input textarea::placeholder { color: var(--text-lo) !important; opacity: 0.7; }
 .chat-input .wrap { border: none !important; box-shadow: none !important; background: transparent !important; }
 
 /* Send button */
@@ -526,7 +541,7 @@ _CSS = """
     background: var(--accent) !important;
     border: none !important;
     border-radius: 10px !important;
-    color: #fff !important;
+    color: var(--accent-fg) !important;
     font-size: 1.05rem !important;
     width: 40px !important;
     min-width: 40px !important;
@@ -535,10 +550,10 @@ _CSS = """
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    transition: background 0.15s, transform 0.1s !important;
+    transition: opacity 0.15s, transform 0.1s !important;
 }
 .send-arrow-btn button:hover {
-    background: #372DB0 !important;
+    opacity: 0.85 !important;
     transform: translateY(-1px) !important;
 }
 
@@ -573,13 +588,29 @@ _CSS = """
 
 /* ── Footer ── */
 .app-footer {
-    color: #9CA3AF !important;
+    color: var(--text-lo) !important;
     font-size: 0.74rem !important;
     text-align: center;
     padding-top: 14px;
     border-top: 1px solid var(--border);
     margin-top: 16px !important;
 }
+
+/* ── Theme toggle button ── */
+.theme-toggle-btn button {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-hi) !important;
+    border-radius: 10px !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    height: 38px !important;
+    font-size: 1rem !important;
+    padding: 0 !important;
+    margin-top: 2px !important;
+    transition: border-color 0.15s !important;
+}
+.theme-toggle-btn button:hover { border-color: var(--accent) !important; }
 
 /* ── Hidden file input trick ── */
 .hidden-upload { display: none !important; }
@@ -619,6 +650,22 @@ async () => {
         const inp = document.querySelector('#hidden-upload-input input[type=file]');
         if (inp) inp.click();
     };
+
+    // Restore saved theme preference (falls back to OS preference)
+    window.applyTheme = function(mode) {
+        document.documentElement.classList.toggle('dark', mode === 'dark');
+    };
+    const saved = localStorage.getItem('study-assistant-theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    window.applyTheme(saved || (prefersDark ? 'dark' : 'light'));
+
+    // Toggle handler for the header button
+    window.toggleTheme = function() {
+        const isDark = document.documentElement.classList.contains('dark');
+        const next = isDark ? 'light' : 'dark';
+        window.applyTheme(next);
+        localStorage.setItem('study-assistant-theme', next);
+    };
 }
 """
 
@@ -631,7 +678,7 @@ app = gr.Blocks(
     css=_CSS,
     js=_JS_INIT,
     theme=gr.themes.Base(
-        primary_hue="indigo",
+        primary_hue="gray",
         neutral_hue="gray",
         font=["Inter", "sans-serif"],
     ),
@@ -640,10 +687,18 @@ app = gr.Blocks(
 with app:
     # ── Header ──────────────────────────────────────────────────────────────
     with gr.Row(elem_classes=["app-header"]):
-        gr.HTML("""
-        <h1><span class="accent-dot"></span>Study Assistant</h1>
-        <p>Azure OpenAI · MCP tools (filesystem · calculator · weather · deadlines) · Upload a syllabus to auto-track due dates</p>
-        """)
+        with gr.Column(scale=1):
+            gr.HTML("""
+            <h1><span class="accent-dot"></span>Study Assistant</h1>
+            <p>Azure OpenAI · MCP tools (filesystem · calculator · weather · deadlines) · Upload a syllabus to auto-track due dates</p>
+            """)
+        with gr.Column(scale=0, min_width=44):
+            theme_toggle_btn = gr.Button(
+                "◐",
+                elem_id="theme-toggle-btn",
+                elem_classes=["theme-toggle-btn"],
+                size="sm",
+            )
 
     # ── Two-column layout: chat + right rail ─────────────────────────────────
     with gr.Row(equal_height=False):
@@ -810,6 +865,12 @@ with app:
     upload_plus_btn.click(
         fn=None,
         js="() => { window.triggerFileUpload(); }",
+    )
+
+    # Theme toggle button → flip light/dark and persist preference
+    theme_toggle_btn.click(
+        fn=None,
+        js="() => { window.toggleTheme(); }",
     )
 
     # When hidden upload receives a file → extract + refresh sidebar + deadline panel
