@@ -6,6 +6,7 @@ import gradio as gr
 import asyncio
 import os
 import sys
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -35,104 +36,84 @@ mcp_client = MCPClient()
 # Track initialization
 mcp_initialized = False
 
-# Custom CSS
-custom_css = """
-.gradio-container {
-    font-family: 'Inter', sans-serif;
-}
-.server-status {
-    padding: 10px;
-    border-radius: 5px;
-    margin: 5px 0;
-}
-.server-running {
-    background-color: #10b981;
-    color: white;
-}
-.server-stopped {
-    background-color: #ef4444;
-    color: white;
-}
-"""
+# In-memory list of uploaded files: [{"name": str, "path": str, "status": str}]
+_uploaded_files: list[dict] = []
 
+
+# ---------------------------------------------------------------------------
+# MCP server init
+# ---------------------------------------------------------------------------
 
 async def initialize_mcp_servers():
     """Initialize MCP servers on startup"""
     global mcp_initialized
-    
+
     if mcp_initialized:
         return "Servers already initialized"
-    
+
     print("Initializing MCP servers...")
-    
-    # Start file system server
+
     fs_success = await mcp_client.start_server(
-        "filesystem",
-        "src/mcp_servers/fs_server.py"
+        "filesystem", "src/mcp_servers/fs_server.py"
     )
-    
-    # Start calculator server
     calc_success = await mcp_client.start_server(
-        "calculator",
-        "src/mcp_servers/calc_server.py"
+        "calculator", "src/mcp_servers/calc_server.py"
     )
-    
-    # Start weather server
     weather_success = await mcp_client.start_server(
-        "weather",
-        "src/mcp_servers/weather_server.py"
+        "weather", "src/mcp_servers/weather_server.py"
+    )
+    deadline_success = await mcp_client.start_server(
+        "deadline", "src/mcp_servers/deadline_server.py"
     )
 
-    # Start deadline server
-    deadline_success = await mcp_client.start_server(
-        "deadline",
-        "src/mcp_servers/deadline_server.py"
-    )
-    
     success_count = sum([fs_success, calc_success, weather_success, deadline_success])
-    
+
     if success_count == 4:
         mcp_initialized = True
-        return "✅ All MCP servers initialized (4/4)"
+        return "All MCP servers initialized (4/4)"
     elif success_count > 0:
         mcp_initialized = True
-        return f"⚠️ Some servers initialized ({success_count}/4)"
+        return f"Some servers initialized ({success_count}/4)"
     else:
-        return "❌ Failed to initialize servers"
+        return "Failed to initialize servers"
 
+
+# ---------------------------------------------------------------------------
+# Chat logic
+# ---------------------------------------------------------------------------
 
 async def process_message(message: str, history: list, use_tools: bool):
     """Process user message and get AI response"""
-    
+
     if not message.strip():
         return history, ""
-    
-    # Initialize history if None
+
     if history is None:
         history = []
-    
+
     try:
-        # Get AI response with MCP tools
         response = await ai_client.chat(
             message=message,
             mcp_client=mcp_client if use_tools else None,
             use_tools=use_tools,
         )
-        
-        # Gradio 6.0 expects messages format: list of dicts with 'role' and 'content'
-        history.append({"role": "user", "content": message})
+        history.append({"role": "user",      "content": message})
         history.append({"role": "assistant", "content": response})
-    
+
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
         print(f"Error processing message: {error_details}")
-        
-        error_msg = f"❌ Error: {str(e)}\n\nPlease check that:\n1. Azure OpenAI credentials are configured\n2. MCP servers are running\n3. Network connection is available"
-        
-        history.append({"role": "user", "content": message})
+        error_msg = (
+            f"Something went wrong: {str(e)}\n\n"
+            "Please check that:\n"
+            "1. Azure OpenAI credentials are configured\n"
+            "2. MCP servers are running\n"
+            "3. Network connection is available"
+        )
+        history.append({"role": "user",      "content": message})
         history.append({"role": "assistant", "content": error_msg})
-    
+
     return history, ""
 
 
@@ -142,23 +123,60 @@ def clear_conversation():
     return [], f"Cleared {count} messages from history"
 
 
+# ---------------------------------------------------------------------------
+# Stats / tools
+# ---------------------------------------------------------------------------
+
 def get_stats():
     """Get chatbot statistics"""
     history_length = ai_client.get_history_length()
     servers = mcp_client.get_all_servers()
-    
-    server_status = "\n".join([f"  • {s} (running)" for s in servers]) if servers else "  No servers running"
-    
-    return f"""### 📊 Statistics
-- **Messages in history:** {history_length}
-- **MCP Servers:** {len(servers)}
+    server_status = (
+        "\n".join([f"- {s} &nbsp;·&nbsp; running" for s in servers])
+        if servers else "- No servers running"
+    )
+    ready = "Ready" if servers else "No tools available"
+    return f"""**Messages in history:** {history_length}  
+**MCP servers connected:** {len(servers)}
 
-**Active Servers:**
 {server_status}
 
-**Status:** {'✅ Ready' if servers else '⚠️ No tools available'}
+**Status:** {ready}
 """
 
+
+def get_available_tools():
+    """Get list of available MCP tools"""
+    servers = mcp_client.get_all_servers()
+
+    if not servers:
+        return (
+            "No MCP servers running yet.\n\n"
+            "Wait for initialization or restart the app."
+        )
+
+    tools_text = ""
+
+    for server_name in servers:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            tools = loop.run_until_complete(mcp_client.list_tools(server_name))
+            loop.close()
+
+            tools_text += f"**{server_name.upper()}**\n"
+            for tool in tools:
+                tools_text += f"- `{tool['name']}` — {tool.get('description', 'No description')}\n"
+            tools_text += "\n"
+        except Exception as e:
+            tools_text += f"**{server_name}** — error loading tools: {str(e)}\n\n"
+
+    return tools_text
+
+
+# ---------------------------------------------------------------------------
+# Deadline panel
+# ---------------------------------------------------------------------------
 
 def get_deadline_panel_content() -> str:
     """Render the upcoming deadlines panel (next 3 days)."""
@@ -166,289 +184,611 @@ def get_deadline_panel_content() -> str:
         deadlines = get_upcoming_deadlines(days=3)
         if not deadlines:
             return (
-                "### 📅 Upcoming Deadlines\n\n"
-                "🎉 Nothing due in the next 3 days — you're all caught up!"
+                "<div class='empty-panel'>"
+                "<div class='empty-panel-icon'>&#10003;</div>"
+                "Nothing due in the next 3 days."
+                "</div>"
             )
         md = format_deadlines_as_markdown(deadlines)
-        return f"### 📅 Upcoming Deadlines (next 3 days)\n\n{md}"
+        return md
     except Exception as e:
-        return f"### 📅 Upcoming Deadlines\n\n⚠️ Could not load deadlines: {e}"
+        return f"<div class='empty-panel error'>Could not load deadlines: {e}</div>"
+
+
+# ---------------------------------------------------------------------------
+# Uploaded files sidebar
+# ---------------------------------------------------------------------------
+
+def _render_files_html() -> str:
+    """Build an HTML list of uploaded files with remove buttons."""
+    if not _uploaded_files:
+        return (
+            "<div class='empty-panel'>"
+            "<div class='empty-panel-icon'>&#128193;</div>"
+            "No files yet.<br>"
+            "<span class='empty-panel-sub'>Use the + button to upload a syllabus.</span>"
+            "</div>"
+        )
+
+    items = ""
+    for i, f in enumerate(_uploaded_files):
+        ext  = Path(f["name"]).suffix.upper().lstrip(".")
+        icon = {"PDF": "PDF", "TXT": "TXT", "MD": "MD"}.get(ext, "DOC")
+        status_class = "ok" if "Added" in f["status"] else ("warn" if "⚠️" in f["status"] else "err")
+        short_status = (f["status"][:60] + "…") if len(f["status"]) > 60 else f["status"]
+        items += f"""
+        <div class='file-item' id='file-item-{i}'>
+          <div class='file-icon'>{icon}</div>
+          <div class='file-info'>
+            <div class='file-name'>{f['name']}</div>
+            <div class='file-status {status_class}'>{short_status}</div>
+          </div>
+          <button class='file-remove-btn'
+                  onclick="removeFile({i})"
+                  title='Remove file'>&times;</button>
+        </div>"""
+
+    return f"<div class='file-list'>{items}</div>"
+
+
+def get_files_html() -> str:
+    """Public accessor for the HTML panel."""
+    return _render_files_html()
 
 
 def handle_file_upload(file_obj) -> tuple:
     """
-    Called when a user uploads a file via the Gradio file input.
-    Runs the async extraction pipeline synchronously.
-
-    Returns:
-        (status_message, updated_deadline_panel_content)
+    Upload handler — extracts deadlines and adds file to sidebar list.
+    Returns (files_html, deadline_panel_md, upload_status_md)
     """
-    if file_obj is None:
-        return "⚠️ No file selected.", get_deadline_panel_content()
+    global _uploaded_files
 
-    file_path = file_obj.name if hasattr(file_obj, 'name') else str(file_obj)
+    if file_obj is None:
+        return get_files_html(), get_deadline_panel_content(), "No file selected."
+
+    file_path = file_obj if isinstance(file_obj, str) else (
+        file_obj.name if hasattr(file_obj, "name") else str(file_obj)
+    )
+    filename = Path(file_path).name
 
     try:
         inserted, skipped, status = asyncio.run(
             process_uploaded_file(file_path, ai_client)
         )
     except Exception as e:
-        import traceback
-        status = f"❌ Upload error: {e}\n{traceback.format_exc()}"
+        status = f"Upload error: {e}"
 
-    return status, get_deadline_panel_content()
+    # Add to sidebar list (avoid exact duplicates by path)
+    if not any(f["path"] == file_path for f in _uploaded_files):
+        _uploaded_files.append({
+            "name":   filename,
+            "path":   file_path,
+            "status": status,
+        })
+
+    return get_files_html(), get_deadline_panel_content(), status
 
 
-def get_available_tools():
-    """Get list of available MCP tools - runs on button click"""
-    servers = mcp_client.get_all_servers()
-    
-    if not servers:
-        return "### 🛠️ Available Tools\n\n⚠️ No MCP servers running\n\nPlease wait for initialization or restart the app."
-    
-    tools_text = "### 🛠️ Available Tools\n\n"
-    
-    for server_name in servers:
-        try:
-            # Use the synchronous run to get tools
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            tools = loop.run_until_complete(mcp_client.list_tools(server_name))
-            loop.close()
-            
-            tools_text += f"**{server_name.upper()}:**\n"
-            for tool in tools:
-                tools_text += f"- `{tool['name']}`: {tool.get('description', 'No description')}\n"
-            tools_text += "\n"
-        except Exception as e:
-            tools_text += f"**{server_name}:** Error loading tools - {str(e)}\n\n"
-    
-    tools_text += """
-**Usage Examples:**
-
-📁 **Files:**
-- "List all files in the directory"
-- "Read test1.txt"
-- "Search for 'MCP' in files"
-
-🔢 **Math:**
-- "Calculate 25 + 75 + 100"
-- "What's the factorial of 8?"
-- "Divide 144 by 12"
-
-🌡️ **Conversions:**
-- "Convert 100°F to Celsius"
-- "Convert 5 miles to kilometers"
-
-🌤️ **Weather:**
-- "What's the weather in London?"
-- "Show forecast for Tokyo"
-- "Compare Dubai and Moscow weather"
-- "List all available cities"
-"""
-    
-    return tools_text
+def remove_file_by_index(index_json: str) -> tuple:
+    """Remove a file entry from the sidebar list by index."""
+    global _uploaded_files
+    try:
+        idx = int(index_json)
+        if 0 <= idx < len(_uploaded_files):
+            _uploaded_files.pop(idx)
+    except (ValueError, TypeError):
+        pass
+    return get_files_html(), get_deadline_panel_content()
 
 
 # ---------------------------------------------------------------------------
-# Gradio Interface — Gradio 6.0 compatible
+# CSS  — modern, clean, light workspace theme
 # ---------------------------------------------------------------------------
+# Token system
+#   Surface   #FFFFFF   Canvas    #F5F6FA   Border   #E6E8F0
+#   Text hi   #12131A   Text lo   #6B7280   Accent   #4338CA (indigo)
+#   Accent soft #EEF0FE  Success  #0F9D58   Warning  #B7791F   Danger #D92D20
+#   Display face: 'Manrope' (headings/labels) · Body/UI face: 'Inter'
 
-_EXTENDED_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
-/* ── Global ── */
+:root {
+    --canvas: #F5F6FA;
+    --surface: #FFFFFF;
+    --border: #E6E8F0;
+    --text-hi: #12131A;
+    --text-lo: #6B7280;
+    --accent: #4338CA;
+    --accent-soft: #EEF0FE;
+    --success: #0F9D58;
+    --warning: #B7791F;
+    --danger: #D92D20;
+}
+
+* { box-sizing: border-box; }
+
 .gradio-container {
     font-family: 'Inter', sans-serif !important;
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e) !important;
+    background: var(--canvas) !important;
     min-height: 100vh;
+    color: var(--text-hi);
 }
 
 /* ── Header ── */
-.deadline-header h1 {
-    background: linear-gradient(90deg, #818cf8, #c084fc);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-size: 2rem;
+.app-header {
+    padding: 18px 4px 10px !important;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px !important;
+}
+.app-header h1 {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: 1.4rem;
+    color: var(--text-hi);
+    margin: 0 0 2px;
+    letter-spacing: -0.01em;
+}
+.app-header h1 .accent-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 8px;
+}
+.app-header p {
+    color: var(--text-lo);
+    font-size: 0.85rem;
+    margin: 0;
+    font-weight: 500;
+}
+
+/* ── Sidebar panels ── */
+.sidebar-panel {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 14px !important;
+    padding: 14px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0 1px 2px rgba(16,24,40,0.03) !important;
+}
+.panel-title {
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.72rem;
     font-weight: 700;
-    margin-bottom: 4px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-lo);
+    margin: 2px 0 10px 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ── Empty state ── */
+.empty-panel {
+    color: var(--text-lo);
+    font-size: 0.82rem;
+    text-align: center;
+    padding: 22px 10px;
+    line-height: 1.6;
+}
+.empty-panel-icon {
+    font-size: 1.1rem;
+    color: var(--accent);
+    margin-bottom: 6px;
+    font-weight: 700;
+}
+.empty-panel-sub { color: #9CA3AF; font-size: 0.76rem; }
+.empty-panel.error { color: var(--danger); }
+
+/* ── Files sidebar ── */
+.file-list { display: flex; flex-direction: column; gap: 6px; }
+.file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--canvas);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 10px;
+    transition: border-color 0.15s, background 0.15s;
+}
+.file-item:hover { border-color: var(--accent); background: var(--accent-soft); }
+.file-icon {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 6px;
+    width: 30px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.file-info { flex: 1; min-width: 0; }
+.file-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-hi);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.file-status {
+    font-size: 0.7rem;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.file-status.ok   { color: var(--success); }
+.file-status.warn { color: var(--warning); }
+.file-status.err  { color: var(--danger); }
+.file-remove-btn {
+    background: transparent;
+    border: none;
+    color: #B0B4C0;
+    border-radius: 6px;
+    width: 22px;
+    height: 22px;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+}
+.file-remove-btn:hover {
+    background: #FEE4E2;
+    color: var(--danger);
 }
 
 /* ── Deadline panel ── */
 .deadline-panel {
-    background: rgba(255,255,255,0.06) !important;
-    border: 1px solid rgba(129,140,248,0.3) !important;
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
     border-radius: 14px !important;
-    padding: 16px !important;
+    padding: 12px 14px !important;
+    font-size: 0.83rem !important;
+    max-height: 280px;
+    overflow-y: auto;
+    box-shadow: 0 1px 2px rgba(16,24,40,0.03) !important;
+}
+.deadline-panel ul { margin: 0; padding-left: 18px; }
+.deadline-panel li { margin-bottom: 6px; color: var(--text-hi); }
+.deadline-panel strong { color: var(--accent); }
+.deadline-panel::-webkit-scrollbar { width: 4px; }
+.deadline-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Chat area ── */
+.chatbot-wrap {
+    border-radius: 16px !important;
+    border: 1px solid var(--border) !important;
+    background: var(--surface) !important;
+    box-shadow: 0 1px 2px rgba(16,24,40,0.03) !important;
 }
 
-/* ── Upload zone ── */
-.upload-zone {
-    border: 2px dashed rgba(129,140,248,0.5) !important;
-    border-radius: 12px !important;
-    background: rgba(129,140,248,0.05) !important;
-    transition: border-color 0.2s ease;
+/* ── Input bar ── */
+.input-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 6px 8px;
+    margin-top: 10px;
+    box-shadow: 0 1px 2px rgba(16,24,40,0.03);
 }
-.upload-zone:hover {
-    border-color: rgba(192,132,252,0.7) !important;
-}
+.input-row:focus-within { border-color: var(--accent); }
 
-/* ── Chatbot bubble colours ── */
-.message.user {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
-    color: #fff !important;
-    border-radius: 18px 18px 4px 18px !important;
+/* + upload button */
+.upload-plus-btn button {
+    background: var(--accent-soft) !important;
+    border: 1px solid transparent !important;
+    border-radius: 10px !important;
+    color: var(--accent) !important;
+    font-size: 1.25rem !important;
+    font-weight: 500 !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    padding: 0 !important;
+    transition: background 0.15s !important;
+    line-height: 1 !important;
 }
-.message.bot {
-    background: rgba(255,255,255,0.08) !important;
-    color: #e2e8f0 !important;
-    border-radius: 18px 18px 18px 4px !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-}
+.upload-plus-btn button:hover { background: #E0E4FC !important; }
 
-/* ── Buttons ── */
-.primary-btn {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+/* Text input inside bar */
+.chat-input textarea {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-hi) !important;
+    font-size: 0.92rem !important;
+    resize: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    padding: 9px 4px !important;
+    min-height: 40px !important;
+    max-height: 120px !important;
+}
+.chat-input textarea::placeholder { color: #A3A7B5 !important; }
+.chat-input .wrap { border: none !important; box-shadow: none !important; background: transparent !important; }
+
+/* Send button */
+.send-arrow-btn button {
+    background: var(--accent) !important;
     border: none !important;
     border-radius: 10px !important;
-    font-weight: 600 !important;
-    transition: opacity 0.2s ease !important;
+    color: #fff !important;
+    font-size: 1.05rem !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: background 0.15s, transform 0.1s !important;
 }
-.primary-btn:hover { opacity: 0.85 !important; }
+.send-arrow-btn button:hover {
+    background: #372DB0 !important;
+    transform: translateY(-1px) !important;
+}
 
-/* ── Status pill ── */
-.status-box textarea {
-    background: rgba(255,255,255,0.05) !important;
-    color: #94a3b8 !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 8px !important;
+/* ── Secondary controls row ── */
+.secondary-row { margin-top: 8px !important; align-items: center !important; }
+.secondary-row button {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-lo) !important;
+    border-radius: 9px !important;
     font-size: 0.78rem !important;
+    font-weight: 500 !important;
+    transition: border-color 0.15s, color 0.15s !important;
+}
+.secondary-row button:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
+.secondary-row label span { font-size: 0.78rem !important; color: var(--text-lo) !important; font-weight: 500 !important; }
+
+/* ── Status box ── */
+.status-box textarea {
+    background: transparent !important;
+    color: var(--text-lo) !important;
+    border: none !important;
+    font-size: 0.76rem !important;
+    text-align: right;
+}
+
+/* ── Divider ── */
+.sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0 12px; }
+
+/* ── Workspace accordion (stats / tools) ── */
+.workspace-accordion { border: 1px solid var(--border) !important; border-radius: 14px !important; background: var(--surface) !important; }
+
+/* ── Footer ── */
+.app-footer {
+    color: #9CA3AF !important;
+    font-size: 0.74rem !important;
+    text-align: center;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    margin-top: 16px !important;
+}
+
+/* ── Hidden file input trick ── */
+.hidden-upload { display: none !important; }
+
+/* ── Scrollable sidebar ── */
+.sidebar-scroll {
+    max-height: calc(100vh - 150px);
+    overflow-y: auto;
+    padding-right: 2px;
+}
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+"""
+
+# ---------------------------------------------------------------------------
+# JavaScript helpers
+# ---------------------------------------------------------------------------
+
+_JS_INIT = """
+async () => {
+    // removeFile(i) is called by the remove button in the files HTML.
+    // It sets a hidden textbox value and triggers the remove button.
+    window.removeFile = function(index) {
+        const tb = document.getElementById('remove-index-box').querySelector('textarea');
+        if (!tb) return;
+        tb.value = String(index);
+        tb.dispatchEvent(new Event('input', {bubbles: true}));
+        // Trigger the hidden remove button
+        setTimeout(() => {
+            const btn = document.getElementById('remove-trigger-btn');
+            if (btn) btn.click();
+        }, 50);
+    };
+
+    // Wire the + button to click the hidden Gradio file input
+    window.triggerFileUpload = function() {
+        const inp = document.querySelector('#hidden-upload-input input[type=file]');
+        if (inp) inp.click();
+    };
 }
 """
 
+# ---------------------------------------------------------------------------
+# Gradio App
+# ---------------------------------------------------------------------------
+
 app = gr.Blocks(
-    title="🤖 AI Chatbot + Deadline Tracker",
-    css=_EXTENDED_CSS,
+    title="Study Assistant · Deadline Tracker",
+    css=_CSS,
+    js=_JS_INIT,
+    theme=gr.themes.Base(
+        primary_hue="indigo",
+        neutral_hue="gray",
+        font=["Inter", "sans-serif"],
+    ),
 )
 
 with app:
-    # ── Header ─────────────────────────────────────────────────────────────
-    with gr.Row(elem_classes=["deadline-header"]):
-        gr.Markdown("""
-        # 🤖 AI Chatbot with MCP Protocol & 📅 Deadline Tracker
-
-        Powered by **Azure OpenAI** · **MCP servers** (filesystem, calculator, weather, deadlines)
-
-        **Chat capabilities:** file ops, math, weather, and deadline Q&A · **Upload a syllabus** to auto-extract deadlines
+    # ── Header ──────────────────────────────────────────────────────────────
+    with gr.Row(elem_classes=["app-header"]):
+        gr.HTML("""
+        <h1><span class="accent-dot"></span>Study Assistant</h1>
+        <p>Azure OpenAI · MCP tools (filesystem · calculator · weather · deadlines) · Upload a syllabus to auto-track due dates</p>
         """)
-    
-    # ── Main layout ────────────────────────────────────────────────────────
-    with gr.Row():
 
-        # ── LEFT: Chat column ───────────────────────────────────────────────
-        with gr.Column(scale=3):
+    # ── Two-column layout: chat + right rail ─────────────────────────────────
+    with gr.Row(equal_height=False):
+
+        # ━━━━━━━━━━━━━━━━ LEFT/CENTER: Chat ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        with gr.Column(scale=4, min_width=420):
+
             chatbot = gr.Chatbot(
                 label="Conversation",
-                height=480,
-                show_label=True,
+                height=520,
+                show_label=False,
+                elem_classes=["chatbot-wrap"],
+                avatar_images=None,
             )
 
-            with gr.Row():
+            # ── Input bar ───────────────────────────────────────────────────
+            with gr.Row(elem_classes=["input-row"]):
+
+                # + button (triggers hidden upload)
+                upload_plus_btn = gr.Button(
+                    "+",
+                    scale=0,
+                    min_width=40,
+                    elem_classes=["upload-plus-btn"],
+                )
+
+                # Text input
                 msg = gr.Textbox(
-                    placeholder="Type your message… or ask 'what's due this week?'",
+                    placeholder="Message… or ask “what's due this week?”",
                     show_label=False,
-                    scale=4,
+                    scale=1,
                     container=False,
+                    lines=1,
+                    max_lines=5,
+                    elem_classes=["chat-input"],
                 )
-                submit_btn = gr.Button("Send 🚀", scale=1, variant="primary", elem_classes=["primary-btn"])
 
-            with gr.Row():
-                clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
+                # Send button
+                submit_btn = gr.Button(
+                    "↑",
+                    scale=0,
+                    min_width=40,
+                    elem_classes=["send-arrow-btn"],
+                )
+
+            # ── Secondary controls row ───────────────────────────────────────
+            with gr.Row(elem_classes=["secondary-row"]):
+                clear_btn = gr.Button("Clear chat", size="sm")
                 use_tools_cb = gr.Checkbox(
-                    label="Enable MCP Tools",
+                    label="MCP tools",
                     value=True,
-                    info="Allow AI to use MCP servers",
+                    scale=0,
+                )
+                status_text = gr.Textbox(
+                    value="Initializing…",
+                    show_label=False,
+                    interactive=False,
+                    scale=2,
+                    elem_classes=["status-box"],
                 )
 
-        # ── RIGHT: Sidebar ──────────────────────────────────────────────────
-        with gr.Column(scale=1):
+        # ━━━━━━━━━━━━━━━━ RIGHT: Files + Deadlines ━━━━━━━━━━━━━━━━━━━━━━━━
+        with gr.Column(scale=2, min_width=280, elem_classes=["sidebar-scroll"]):
 
-            # ── Deadline Panel ──────────────────────────────────────────────
+            # ── Uploaded Files panel ─────────────────────────────────────────
+            gr.HTML("<div class='panel-title'>Uploaded files</div>")
+            files_panel = gr.HTML(
+                value=get_files_html(),
+                elem_classes=["sidebar-panel"],
+            )
+
+            # Hidden: file uploader (triggered by + button)
+            hidden_upload = gr.File(
+                label="",
+                file_types=[".txt", ".md", ".pdf"],
+                type="filepath",
+                visible=False,
+                elem_id="hidden-upload-input",
+            )
+            # Hidden: upload status fed back to sidebar
+            upload_status_md = gr.Markdown(visible=False)
+
+            # Hidden machinery for JS → Python remove call
+            remove_index_box = gr.Textbox(
+                value="",
+                visible=False,
+                elem_id="remove-index-box",
+            )
+            remove_trigger_btn = gr.Button(
+                "remove",
+                visible=False,
+                elem_id="remove-trigger-btn",
+            )
+
+            # ── Deadlines panel ──────────────────────────────────────────────
+            gr.HTML("<div class='panel-title'>Upcoming deadlines</div>")
             deadline_panel = gr.Markdown(
                 value=get_deadline_panel_content(),
                 elem_classes=["deadline-panel"],
             )
+            refresh_deadlines_btn = gr.Button("Refresh deadlines", size="sm")
 
-            with gr.Row():
-                refresh_deadlines_btn = gr.Button("🔄 Refresh", size="sm", scale=1)
+            gr.HTML("<hr class='sidebar-divider'>")
 
-            gr.Markdown("---")
+            # ── Workspace (stats / tools / examples), tucked away ─────────────
+            with gr.Accordion("Workspace", open=False, elem_classes=["workspace-accordion"]):
+                stats_display = gr.Markdown(get_stats())
+                refresh_stats_btn = gr.Button("Refresh stats", size="sm")
 
-            # ── Syllabus Upload ─────────────────────────────────────────────
-            gr.Markdown("#### 📁 Upload Syllabus")
-            upload_file = gr.File(
-                label="Upload a syllabus (.txt, .md, .pdf)",
-                file_types=[".txt", ".md", ".pdf"],
-                type="filepath",
-                elem_classes=["upload-zone"],
-            )
-            upload_status = gr.Markdown("Upload a syllabus to auto-extract deadlines.")
+                with gr.Accordion("Available tools", open=False):
+                    tools_display = gr.Markdown("Loading tools…")
+                    refresh_tools_btn = gr.Button("Refresh tools", size="sm")
 
-            gr.Markdown("---")
-
-            # ── Stats & Tools ───────────────────────────────────────────────
-            gr.Markdown("#### ⚙️ Control Panel")
-            stats_display = gr.Markdown(get_stats())
-            refresh_stats_btn = gr.Button("🔄 Refresh Stats", size="sm")
-
-            with gr.Accordion("📖 Available Tools", open=False):
-                tools_display = gr.Markdown("Loading tools...")
-                refresh_tools_btn = gr.Button("🔄 Refresh Tools", size="sm")
-
-            with gr.Accordion("💡 Quick Examples", open=False):
-                gr.Markdown("""
-**Deadline Tracker:**
+                with gr.Accordion("Quick examples", open=False):
+                    gr.Markdown("""
+**Deadlines**
 - What's due this week?
 - Show all my deadlines
 - Mark Homework 1 as done
-- Add deadline: CS101, Final Exam, 2025-12-15
 
-**File Operations (MCP):**
-- List all files
-- Read test1.txt
+**Files (MCP)**
+- List all files · Read test1.txt
 
-**Calculations (MCP):**
+**Math (MCP)**
 - Add 10, 20, and 30
-- Calculate factorial of 8
 
-**Weather (MCP):**
-- What's the weather in London?
-- Compare Dubai and Moscow weather
-                """)
+**Weather (MCP)**
+- Weather in London?
+                    """)
 
-            status_text = gr.Textbox(
-                label="Status",
-                value="Initializing...",
-                interactive=False,
-                elem_classes=["status-box"],
-            )
+    # ── Footer ───────────────────────────────────────────────────────────────
+    gr.HTML(
+        "<div class='app-footer'>Conversations processed via Azure OpenAI · "
+        "Deadlines stored locally in <code>deadlines.db</code> · "
+        "Built with Gradio · Azure OpenAI · MCP · SQLite</div>"
+    )
 
-    # ── Footer ──────────────────────────────────────────────────────────────
-    gr.Markdown("""
----
-### 🔒 Privacy & Security
-- Conversations processed through Azure OpenAI · MCP servers run in isolated processes
-- Deadlines stored locally in `deadlines.db` · File access restricted to designated directory
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # Event wiring
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**Built with** Gradio · Azure OpenAI · MCP Protocol · SQLite
-    """)
-
-    # ── Event handlers ──────────────────────────────────────────────────────
     def submit_message(message, history, use_tools):
-        return asyncio.run(
-            process_message(message, history, use_tools)
-        )
+        return asyncio.run(process_message(message, history, use_tools))
 
+    # Send on button or Enter
     submit_btn.click(
         fn=submit_message,
         inputs=[msg, chatbot, use_tools_cb],
@@ -459,65 +799,74 @@ with app:
         inputs=[msg, chatbot, use_tools_cb],
         outputs=[chatbot, msg],
     )
+
+    # Clear chat
     clear_btn.click(
         fn=clear_conversation,
         outputs=[chatbot, status_text],
     )
-    refresh_stats_btn.click(
-        fn=get_stats,
-        outputs=stats_display,
-    )
-    refresh_tools_btn.click(
-        fn=get_available_tools,
-        outputs=tools_display,
-    )
-    refresh_deadlines_btn.click(
-        fn=get_deadline_panel_content,
-        outputs=deadline_panel,
+
+    # + button → trigger hidden file input via JS
+    upload_plus_btn.click(
+        fn=None,
+        js="() => { window.triggerFileUpload(); }",
     )
 
-    # File upload: extract → save → refresh panel
-    upload_file.upload(
+    # When hidden upload receives a file → extract + refresh sidebar + deadline panel
+    hidden_upload.upload(
         fn=handle_file_upload,
-        inputs=[upload_file],
-        outputs=[upload_status, deadline_panel],
+        inputs=[hidden_upload],
+        outputs=[files_panel, deadline_panel, upload_status_md],
     )
 
-    # Auto-refresh on load
-    app.load(fn=get_available_tools,       outputs=tools_display)
-    app.load(fn=get_stats,                 outputs=stats_display)
-    app.load(fn=get_deadline_panel_content, outputs=deadline_panel)
+    # JS remove button → remove_index_box changes → remove_trigger_btn fires → Python
+    remove_trigger_btn.click(
+        fn=remove_file_by_index,
+        inputs=[remove_index_box],
+        outputs=[files_panel, deadline_panel],
+    )
 
+    # Sidebar refresh buttons
+    refresh_deadlines_btn.click(fn=get_deadline_panel_content, outputs=deadline_panel)
+    refresh_stats_btn.click(fn=get_stats, outputs=stats_display)
+    refresh_tools_btn.click(fn=get_available_tools, outputs=tools_display)
+
+    # Auto-refresh on page load
+    app.load(fn=get_available_tools,        outputs=tools_display)
+    app.load(fn=get_stats,                  outputs=stats_display)
+    app.load(fn=get_deadline_panel_content, outputs=deadline_panel)
+    app.load(fn=get_files_html,             outputs=files_panel)
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     print("Starting AI Chatbot with MCP Protocol + Deadline Tracker...")
-    print("="*60)
+    print("=" * 60)
 
-    # 1. Initialize MCP servers
     try:
         init_result = asyncio.run(initialize_mcp_servers())
         print(init_result)
-        print("="*60)
+        print("=" * 60)
     except Exception as e:
-        print(f"⚠️ Warning: MCP initialization failed - {e}")
+        print(f"Warning: MCP initialization failed - {e}")
         print("App will start but tools may not be available")
         import traceback
         traceback.print_exc()
 
-    # 2. Start daily digest scheduler (background daemon thread)
     try:
         start_digest_scheduler()
-        print("✅ Digest scheduler started")
+        print("Digest scheduler started")
     except Exception as e:
-        print(f"⚠️ Digest scheduler failed to start: {e}")
+        print(f"Digest scheduler failed to start: {e}")
 
-    # 3. Debug info
     servers = mcp_client.get_all_servers()
-    print(f"\n✅ Active MCP Servers: {servers}")
-    print(f"✅ MCP Initialized: {mcp_initialized}")
-    print("="*60 + "\n")
+    print(f"\nActive MCP Servers: {servers}")
+    print(f"MCP Initialized: {mcp_initialized}")
+    print("=" * 60 + "\n")
 
-    # 4. Launch Gradio
     app.launch(
         server_name="0.0.0.0",
         server_port=int(os.getenv("APP_PORT", "7860")),
