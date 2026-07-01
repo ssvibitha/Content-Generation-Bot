@@ -326,7 +326,6 @@ class AzureOpenAIClient:
         message: str,
         mcp_client=None,
         use_tools: bool = True,
-        temperature: float = 0.7,
         max_completion_tokens: int = 2000
     ) -> str:
         """Send message and get response with optional MCP tool usage"""
@@ -351,7 +350,6 @@ class AzureOpenAIClient:
             response = await self.client.chat.completions.create(
                 model=self.deployment,
                 messages=messages,
-                temperature=temperature,
                 max_completion_tokens=max_completion_tokens,
                 tools=tools if tools else None,
                 tool_choice="auto" if tools else None
@@ -365,7 +363,6 @@ class AzureOpenAIClient:
                 return await self._handle_tool_calls(
                     assistant_message,
                     mcp_client,
-                    temperature,
                     max_completion_tokens
                 )
             else:
@@ -389,7 +386,6 @@ class AzureOpenAIClient:
         self,
         assistant_message,
         mcp_client,
-        temperature,
         max_completion_tokens
     ) -> str:
         """Handle MCP tool calls from AI"""
@@ -473,7 +469,6 @@ class AzureOpenAIClient:
         final_response = await self.client.chat.completions.create(
             model=self.deployment,
             messages=messages,
-            temperature=temperature,
             max_completion_tokens=max_completion_tokens
         )
         
