@@ -1124,7 +1124,7 @@ async def initialize_mcp_servers():
         return "❌ Failed to initialize servers"
 
 
-async def process_message(message: str, history: list, use_tools: bool, temperature: float):
+async def process_message(message: str, history: list, use_tools: bool):
     """Process user message and get AI response"""
     
     if not message.strip():
@@ -1140,7 +1140,6 @@ async def process_message(message: str, history: list, use_tools: bool, temperat
             message=message,
             mcp_client=mcp_client if use_tools else None,
             use_tools=use_tools,
-            temperature=temperature
         )
         
         # Gradio 6.0 expects messages format: list of dicts with 'role' and 'content'
@@ -1275,14 +1274,6 @@ with app:
                     value=True,
                     info="Allow AI to use MCP servers"
                 )
-                temperature_slider = gr.Slider(
-                    minimum=0.0,
-                    maximum=2.0,
-                    value=0.7,
-                    step=0.1,
-                    label="Temperature",
-                    info="Higher = more creative"
-                )
         
         with gr.Column(scale=1):
             gr.Markdown("## ⚙️ Control Panel")
@@ -1332,20 +1323,20 @@ with app:
             )
     
     # Event handlers
-    def submit_message(message, history, use_tools, temperature):
+    def submit_message(message, history, use_tools):
         return asyncio.run(
-            process_message(message, history, use_tools, temperature)
+            process_message(message, history, use_tools)
         )
     
     submit_btn.click(
         fn=submit_message,
-        inputs=[msg, chatbot, use_tools_cb, temperature_slider],
+        inputs=[msg, chatbot, use_tools_cb],
         outputs=[chatbot, msg]
     )
     
     msg.submit(
         fn=submit_message,
-        inputs=[msg, chatbot, use_tools_cb, temperature_slider],
+        inputs=[msg, chatbot, use_tools_cb],
         outputs=[chatbot, msg]
     )
     
