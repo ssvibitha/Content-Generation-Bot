@@ -511,6 +511,12 @@ WEATHER:
 - "compare weather", "weather difference" → USE the weather_compare_weather tool
 - "list cities", "which cities", "available cities" → USE the weather_list_cities tool
 
+DEADLINE TRACKER:
+- "what's due", "what do I have due", "upcoming deadlines", "what's due this week", "any deadlines soon", "show my assignments" → USE the deadline_get_upcoming_deadlines tool
+- "show all deadlines", "list all my deadlines", "all assignments" → USE the deadline_get_all_deadlines tool
+- "I finished", "mark as done", "I submitted", "I completed" → USE the deadline_mark_done tool
+- "add a deadline", "add assignment", "remind me about", "track this deadline" → USE the deadline_add_deadline tool
+
 ALWAYS use the appropriate tool when the user's request matches these patterns. Do not just describe what you would do - actually call the tool.
 
 When you use a tool, interpret the results and present them in a friendly, conversational way."""
