@@ -61,7 +61,7 @@
 #         mcp_client=None,
 #         use_tools: bool = True,
 #         temperature: float = 0.7,
-#         max_tokens: int = 2000
+#         max_completion_tokens: int = 2000
 #     ) -> str:
 #         """Send message and get response with optional MCP tool usage"""
         
@@ -86,7 +86,7 @@
 #                 model=self.deployment,
 #                 messages=messages,
 #                 temperature=temperature,
-#                 max_tokens=max_tokens,
+#                 max_completion_tokens=max_completion_tokens,
 #                 tools=tools if tools else None,
 #                 tool_choice="auto" if tools else None
 #             )
@@ -100,7 +100,7 @@
 #                     assistant_message,
 #                     mcp_client,
 #                     temperature,
-#                     max_tokens
+#                     max_completion_tokens
 #                 )
 #             else:
 #                 # Regular response
@@ -124,7 +124,7 @@
 #         assistant_message,
 #         mcp_client,
 #         temperature,
-#         max_tokens
+#         max_completion_tokens
 #     ) -> str:
 #         """Handle MCP tool calls from AI"""
         
@@ -208,7 +208,7 @@
 #             model=self.deployment,
 #             messages=messages,
 #             temperature=temperature,
-#             max_tokens=max_tokens
+#             max_completion_tokens=max_completion_tokens
 #         )
         
 #         final_text = final_response.choices[0].message.content
@@ -327,7 +327,7 @@ class AzureOpenAIClient:
         mcp_client=None,
         use_tools: bool = True,
         temperature: float = 0.7,
-        max_tokens: int = 2000
+        max_completion_tokens: int = 2000
     ) -> str:
         """Send message and get response with optional MCP tool usage"""
         
@@ -352,7 +352,7 @@ class AzureOpenAIClient:
                 model=self.deployment,
                 messages=messages,
                 temperature=temperature,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_completion_tokens,
                 tools=tools if tools else None,
                 tool_choice="auto" if tools else None
             )
@@ -366,7 +366,7 @@ class AzureOpenAIClient:
                     assistant_message,
                     mcp_client,
                     temperature,
-                    max_tokens
+                    max_completion_tokens
                 )
             else:
                 # Regular response
@@ -390,7 +390,7 @@ class AzureOpenAIClient:
         assistant_message,
         mcp_client,
         temperature,
-        max_tokens
+        max_completion_tokens
     ) -> str:
         """Handle MCP tool calls from AI"""
         
@@ -474,7 +474,7 @@ class AzureOpenAIClient:
             model=self.deployment,
             messages=messages,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_completion_tokens=max_completion_tokens
         )
         
         final_text = final_response.choices[0].message.content

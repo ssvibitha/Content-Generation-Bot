@@ -24,7 +24,7 @@ async def test_connection():
             messages=[
                 {"role": "user", "content": "Say 'Connection successful!'"}
             ],
-            max_tokens=50
+            max_completion_tokens=50
         )
         print("✓ Connection successful!")
         print(f"Response: {response.choices[0].message.content}")
