@@ -187,30 +187,38 @@ def get_all_deadlines() -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 def format_deadlines_as_markdown(deadlines: List[Dict[str, Any]]) -> str:
-    """Render a list of deadline dicts as a markdown table."""
+    """Render deadlines as a compact course-first list with due-date details."""
     if not deadlines:
         return "🎉 No upcoming deadlines — you're all caught up!"
 
-    lines = [
-        "| # | Course | Assignment | Due Date | Days Left | Status |",
-        "|---|--------|------------|----------|-----------|--------|",
-    ]
-    for i, d in enumerate(deadlines, 1):
+    lines = []
+    for d in deadlines:
         days_left = d.get("days_left")
+        due_date = d.get("due_date", "")
+
         if days_left is None:
             dl_str = "?"
+            day_label = "days"
         elif days_left == 0:
-            dl_str = "🔴 **Today!**"
+            dl_str = "0"
+            day_label = "days"
         elif days_left == 1:
-            dl_str = "🟠 **Tomorrow**"
+            dl_str = "1"
+            day_label = "day"
         else:
-            dl_str = f"🟡 {days_left} days"
+            dl_str = str(days_left)
+            day_label = "days"
 
-        status_icon = "✅" if d["status"] == "done" else "⏳"
-        lines.append(
-            f"| {i} | {d['course_name']} | {d['assignment_name']} "
-            f"| {d['due_date']} | {dl_str} | {status_icon} {d['status']} |"
-        )
+        assignment = d.get("assignment_name", "")
+        course = d.get("course_name", "")
+        if assignment:
+            title = f"{course} — {assignment}" if course else assignment
+        else:
+            title = course
+
+        lines.append(f"- {title}")
+        lines.append(f"  due in {dl_str} {day_label} ({due_date})")
+
     return "\n".join(lines)
 
 
