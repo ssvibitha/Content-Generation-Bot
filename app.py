@@ -10,6 +10,9 @@ import json
 from pathlib import Path
 from dotenv import load_dotenv
 
+STATIC_DIR = Path(__file__).parent / "static"
+STYLES_CSS_PATH = STATIC_DIR / "styles.css"
+
 # Add src to path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root / "src"))
@@ -284,430 +287,12 @@ def remove_file_by_index(index_json: str) -> tuple:
 # ---------------------------------------------------------------------------
 # CSS  — modern, clean, neutral workspace theme (light + dark)
 # ---------------------------------------------------------------------------
-# Token system — all grey/neutral, no color accent
-#   Light: Canvas #F6F6F7  Surface #FFFFFF  Border #E4E4E7  Text hi #18181B  Text lo #6B6F76
-#   Dark:  Canvas #1B1B1E  Surface #232326  Border #38383D  Text hi #F2F2F3  Text lo #9A9AA1
-#   Accent is a neutral charcoal/light-grey (theme-aware), not a hue.
-#   Display face: 'Manrope' (headings/labels) · Body/UI face: 'Inter'
 
-_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap');
-
-:root {
-    --canvas: #F6F6F7;
-    --surface: #FFFFFF;
-    --border: #E4E4E7;
-    --text-hi: #18181B;
-    --text-lo: #6B6F76;
-    --accent: #3F3F46;
-    --accent-fg: #FFFFFF;
-    --accent-soft: #EFEFF1;
-    --success: #178653;
-    --warning: #9A6700;
-    --danger: #C0362C;
-}
-
-.dark {
-    --canvas: #1B1B1E;
-    --surface: #232326;
-    --border: #38383D;
-    --text-hi: #F2F2F3;
-    --text-lo: #9A9AA1;
-    --accent: #D4D4D8;
-    --accent-fg: #18181B;
-    --accent-soft: #2E2E33;
-    --success: #34D399;
-    --warning: #F5B94D;
-    --danger: #F87171;
-}
-
-* { box-sizing: border-box; }
-
-.gradio-container {
-    font-family: 'Inter', sans-serif !important;
-    background: var(--canvas) !important;
-    min-height: 100vh;
-    color: var(--text-hi);
-}
-
-/* ── Header ── */
-.app-header {
-    padding: 18px 4px 10px !important;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 14px !important;
-}
-.app-header h1 {
-    font-family: 'Manrope', sans-serif;
-    font-weight: 800;
-    font-size: 1.4rem;
-    color: var(--text-hi);
-    margin: 0 0 2px;
-    letter-spacing: -0.01em;
-}
-.app-header h1 .accent-dot {
-    display: inline-block;
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
-    margin-right: 8px;
-}
-.app-header p {
-    color: var(--text-lo);
-    font-size: 0.85rem;
-    margin: 0;
-    font-weight: 500;
-}
-
-/* ── Sidebar panels ── */
-.sidebar-panel {
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 14px !important;
-    padding: 14px !important;
-    margin-bottom: 12px !important;
-    box-shadow: 0 1px 2px rgba(16,24,40,0.03) !important;
-}
-.panel-title {
-    font-family: 'Manrope', sans-serif;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-lo);
-    margin: 2px 0 10px 2px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-/* ── Empty state ── */
-.empty-panel {
-    color: var(--text-lo);
-    font-size: 0.82rem;
-    text-align: center;
-    padding: 22px 10px;
-    line-height: 1.6;
-}
-.empty-panel-icon {
-    font-size: 1.1rem;
-    color: var(--accent);
-    margin-bottom: 6px;
-    font-weight: 700;
-}
-.empty-panel-sub { color: var(--text-lo); font-size: 0.76rem; opacity: 0.8; }
-.empty-panel.error { color: var(--danger); }
-
-/* ── Files sidebar ── */
-.file-list { display: flex; flex-direction: column; gap: 6px; }
-.file-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--canvas);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px 10px;
-    transition: border-color 0.15s, background 0.15s;
-}
-.file-item:hover { border-color: var(--accent); background: var(--accent-soft); }
-.file-icon {
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    flex-shrink: 0;
-    background: var(--accent-soft);
-    color: var(--accent);
-    border-radius: 6px;
-    width: 30px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.file-info { flex: 1; min-width: 0; }
-.file-name {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-hi);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.file-status {
-    font-size: 0.7rem;
-    margin-top: 2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.file-status.ok   { color: var(--success); }
-.file-status.warn { color: var(--warning); }
-.file-status.err  { color: var(--danger); }
-.file-remove-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-lo);
-    border-radius: 6px;
-    width: 22px;
-    height: 22px;
-    font-size: 1rem;
-    line-height: 1;
-    cursor: pointer;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s, color 0.15s;
-}
-.file-remove-btn:hover {
-    background: var(--accent-soft);
-    color: var(--danger);
-}
-
-/* ── Deadline panel ── */
-.deadline-panel {
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 14px !important;
-    padding: 12px 14px !important;
-    font-size: 0.83rem !important;
-    max-height: 280px;
-    overflow-y: auto;
-    box-shadow: 0 1px 2px rgba(16,24,40,0.03) !important;
-}
-.deadline-panel ul { margin: 0; padding-left: 18px; }
-.deadline-panel li { margin-bottom: 6px; color: var(--text-hi); }
-.deadline-panel strong { color: var(--accent); }
-.deadline-panel::-webkit-scrollbar { width: 4px; }
-.deadline-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-/* ── Chat area ── */
-.chatbot-wrap {
-    border-radius: 16px !important;
-    border: 1px solid var(--border) !important;
-    background: var(--surface) !important;
-    box-shadow: 0 1px 2px rgba(16,24,40,0.03) !important;
-}
-
-/* ── Input bar ── */
-.input-row {
-    display: flex;
-    align-items: flex-end;
-    gap: 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 26px;
-    padding: 8px 10px;
-    margin-top: 10px;
-    box-shadow: 0 1px 3px rgba(16,24,40,0.05);
-    transition: border-color 0.15s, box-shadow 0.15s;
-}
-.input-row:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 2px 8px rgba(16,24,40,0.08);
-}
-
-/* + upload button (gr.UploadButton renders as a <label> styled like a button) */
-.upload-plus-btn button,
-.upload-plus-btn label {
-    background: var(--accent-soft) !important;
-    border: 1px solid transparent !important;
-    border-radius: 12px !important;
-    color: var(--accent) !important;
-    font-size: 1.4rem !important;
-    font-weight: 500 !important;
-    width: 44px !important;
-    min-width: 44px !important;
-    height: 44px !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    transition: background 0.15s !important;
-    line-height: 1 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    cursor: pointer !important;
-}
-.upload-plus-btn button:hover,
-.upload-plus-btn label:hover { background: var(--border) !important; }
-.upload-plus-btn .wrap { border: none !important; box-shadow: none !important; }
-
-/* Text input inside bar — Gemini-style: larger, roomier, pill-shaped */
-.chat-input textarea {
-    background: transparent !important;
-    border: none !important;
-    color: var(--text-hi) !important;
-    font-size: 1rem !important;
-    line-height: 1.5 !important;
-    resize: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-    padding: 14px 10px !important;
-    min-height: 56px !important;
-    max-height: 220px !important;
-}
-.chat-input textarea::placeholder { color: var(--text-lo) !important; opacity: 0.7; }
-.chat-input .wrap { border: none !important; box-shadow: none !important; background: transparent !important; }
-
-/* Send button */
-.send-arrow-btn button {
-    background: var(--accent) !important;
-    border: none !important;
-    border-radius: 12px !important;
-    color: var(--accent-fg) !important;
-    font-size: 1.2rem !important;
-    width: 44px !important;
-    min-width: 44px !important;
-    height: 44px !important;
-    padding: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    transition: opacity 0.15s, transform 0.1s !important;
-}
-.send-arrow-btn button:hover {
-    opacity: 0.85 !important;
-    transform: translateY(-1px) !important;
-}
-
-/* ── Secondary controls row ── */
-.secondary-row { margin-top: 8px !important; align-items: center !important; }
-.secondary-row button {
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    color: var(--text-lo) !important;
-    border-radius: 9px !important;
-    font-size: 0.78rem !important;
-    font-weight: 500 !important;
-    transition: border-color 0.15s, color 0.15s !important;
-}
-.secondary-row button:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
-.secondary-row label span { font-size: 0.78rem !important; color: var(--text-lo) !important; font-weight: 500 !important; }
-
-/* ── Status box ── */
-.status-box textarea {
-    background: transparent !important;
-    color: var(--text-lo) !important;
-    border: none !important;
-    font-size: 0.76rem !important;
-    text-align: right;
-}
-
-/* Status line under the Workspace button */
-.workspace-status textarea {
-    background: transparent !important;
-    color: var(--text-lo) !important;
-    border: none !important;
-    font-size: 0.75rem !important;
-    text-align: center !important;
-    padding: 4px 0 0 !important;
-}
-
-/* ── Divider ── */
-.sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0 12px; }
-
-/* ── Workspace launcher button ── */
-.workspace-open-btn button {
-    width: 100% !important;
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    color: var(--text-hi) !important;
-    border-radius: 12px !important;
-    font-weight: 600 !important;
-    font-size: 0.85rem !important;
-    padding: 10px !important;
-    transition: border-color 0.15s, background 0.15s !important;
-}
-.workspace-open-btn button:hover {
-    border-color: var(--accent) !important;
-    background: var(--accent-soft) !important;
-}
-
-/* ── Workspace modal ── */
-.modal-overlay {
-    position: fixed !important;
-    inset: 0 !important;
-    background: rgba(0,0,0,0.45) !important;
-    z-index: 1000 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 24px !important;
-}
-.modal-content {
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 18px !important;
-    padding: 20px 22px !important;
-    width: min(560px, 100%) !important;
-    max-height: min(80vh, 700px) !important;
-    overflow-y: auto !important;
-    box-shadow: 0 12px 40px rgba(16,24,40,0.25) !important;
-}
-.modal-content::-webkit-scrollbar { width: 5px; }
-.modal-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.modal-title-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-}
-.modal-title-row h2 {
-    font-family: 'Manrope', sans-serif;
-    font-size: 1.05rem;
-    font-weight: 800;
-    color: var(--text-hi);
-    margin: 0;
-}
-.modal-close-btn button {
-    background: var(--accent-soft) !important;
-    border: none !important;
-    border-radius: 8px !important;
-    color: var(--text-hi) !important;
-    width: 30px !important;
-    min-width: 30px !important;
-    height: 30px !important;
-    padding: 0 !important;
-    font-size: 1rem !important;
-}
-.modal-close-btn button:hover { background: var(--border) !important; }
-.workspace-accordion { border: 1px solid var(--border) !important; border-radius: 14px !important; background: var(--canvas) !important; margin-top: 8px !important; }
-
-/* ── Footer ── */
-.app-footer {
-    color: var(--text-lo) !important;
-    font-size: 0.74rem !important;
-    text-align: center;
-    padding-top: 14px;
-    border-top: 1px solid var(--border);
-    margin-top: 16px !important;
-}
-
-/* ── Theme toggle button ── */
-.theme-toggle-btn button {
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    color: var(--text-hi) !important;
-    border-radius: 10px !important;
-    width: 38px !important;
-    min-width: 38px !important;
-    height: 38px !important;
-    font-size: 1rem !important;
-    padding: 0 !important;
-    margin-top: 2px !important;
-    transition: border-color 0.15s !important;
-}
-.theme-toggle-btn button:hover { border-color: var(--accent) !important; }
-
-/* ── Scrollable sidebar ── */
-.sidebar-scroll {
-    max-height: calc(100vh - 150px);
-    overflow-y: auto;
-    padding-right: 2px;
-}
-.sidebar-scroll::-webkit-scrollbar { width: 4px; }
-.sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-"""
+_CSS = (
+    STYLES_CSS_PATH.read_text(encoding="utf-8")
+    if STYLES_CSS_PATH.exists()
+    else ""
+)
 
 # ---------------------------------------------------------------------------
 # JavaScript helpers
@@ -796,7 +381,6 @@ with app:
                     file_types=[".txt", ".md", ".pdf"],
                     scale=0,
                     min_width=44,
-                    min_height=44,
                     elem_classes=["upload-plus-btn"],
                 )
 
@@ -805,10 +389,7 @@ with app:
                     placeholder="Message… or ask “what's due this week?”",
                     show_label=False,
                     scale=1,
-                    container=False,
-                    lines=2,
-                    max_lines=8,
-                    elem_classes=["chat-input"],
+                    container=False
                 )
 
                 # Send button
@@ -816,8 +397,7 @@ with app:
                     "↑",
                     scale=0,
                     min_width=44,
-                    min_height=44,
-                    elem_classes=["send-arrow-btn"],
+                    elem_classes=["send-arrow-btn"]
                 )
 
             # ── Secondary controls row ───────────────────────────────────────
@@ -826,7 +406,7 @@ with app:
                 use_tools_cb = gr.Checkbox(
                     label="MCP tools",
                     value=True,
-                    scale=0,
+                    scale=0
                 )
 
         # ━━━━━━━━━━━━━━━━ RIGHT: Files + Deadlines ━━━━━━━━━━━━━━━━━━━━━━━━
@@ -870,6 +450,8 @@ with app:
             workspace_open_btn = gr.Button(
                 "Workspace",
                 elem_classes=["workspace-open-btn"],
+                scale=0,
+                min_width=0,
             )
             status_text = gr.Textbox(
                 value="Initializing…",
@@ -878,37 +460,37 @@ with app:
                 elem_classes=["workspace-status"],
             )
 
-        # ── Workspace modal (stats / tools / examples) ────────────────────────
-        with gr.Column(visible=False, elem_classes=["modal-overlay"]) as workspace_modal:
-            with gr.Column(elem_classes=["modal-content"]):
-                with gr.Row(elem_classes=["modal-title-row"]):
-                    gr.HTML("<h2>Workspace</h2>")
-                    workspace_close_btn = gr.Button("✕", elem_classes=["modal-close-btn"], scale=0, min_width=30)
+            # ── Workspace modal (stats / tools / examples) ────────────────────────
+            with gr.Column(visible=False, elem_classes=["modal-overlay"]) as workspace_modal:
+                with gr.Column(elem_classes=["modal-content"]):
+                    with gr.Row(elem_classes=["modal-title-row"]):
+                        gr.HTML("<h2>Workspace</h2>")
+                        workspace_close_btn = gr.Button("✕", elem_classes=["modal-close-btn"], scale=0, min_width=30)
 
-                with gr.Accordion("Stats", open=True, elem_classes=["workspace-accordion"]):
-                    stats_display = gr.Markdown(get_stats())
-                    refresh_stats_btn = gr.Button("Refresh stats", size="sm")
+                    with gr.Accordion("Stats", open=True, elem_classes=["workspace-accordion"]):
+                        stats_display = gr.Markdown(get_stats())
+                        refresh_stats_btn = gr.Button("Refresh stats", size="sm")
 
-                with gr.Accordion("Available tools", open=False, elem_classes=["workspace-accordion"]):
-                    tools_display = gr.Markdown("Loading tools…")
-                    refresh_tools_btn = gr.Button("Refresh tools", size="sm")
+                    with gr.Accordion("Available tools", open=False, elem_classes=["workspace-accordion"]):
+                        tools_display = gr.Markdown("Loading tools…")
+                        refresh_tools_btn = gr.Button("Refresh tools", size="sm")
 
-                with gr.Accordion("Quick examples", open=False, elem_classes=["workspace-accordion"]):
-                    gr.Markdown("""
-                    **Deadlines**
-                    - What's due this week?
-                    - Show all my deadlines
-                    - Mark Homework 1 as done
+                    with gr.Accordion("Quick examples", open=False, elem_classes=["workspace-accordion"]):
+                        gr.Markdown("""
+                        **Deadlines**
+                        - What's due this week?
+                        - Show all my deadlines
+                        - Mark Homework 1 as done
 
-                    **Files (MCP)**
-                    - List all files · Read test1.txt
+                        **Files (MCP)**
+                        - List all files · Read test1.txt
 
-                    **Math (MCP)**
-                    - Add 10, 20, and 30
+                        **Math (MCP)**
+                        - Add 10, 20, and 30
 
-                    **Weather (MCP)**
-                    - Weather in London?
-                                    """)
+                        **Weather (MCP)**
+                        - Weather in London?
+                                        """)
 
     # ── Footer ───────────────────────────────────────────────────────────────
     gr.HTML(
