@@ -493,45 +493,58 @@ _CSS = """
 .input-row {
     display: flex;
     align-items: flex-end;
-    gap: 8px;
+    gap: 10px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 6px 8px;
+    border-radius: 26px;
+    padding: 8px 10px;
     margin-top: 10px;
-    box-shadow: 0 1px 2px rgba(16,24,40,0.03);
+    box-shadow: 0 1px 3px rgba(16,24,40,0.05);
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
-.input-row:focus-within { border-color: var(--accent); }
+.input-row:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(16,24,40,0.08);
+}
 
-/* + upload button */
-.upload-plus-btn button {
+/* + upload button (gr.UploadButton renders as a <label> styled like a button) */
+.upload-plus-btn button,
+.upload-plus-btn label {
     background: var(--accent-soft) !important;
     border: 1px solid transparent !important;
-    border-radius: 10px !important;
+    border-radius: 12px !important;
     color: var(--accent) !important;
-    font-size: 1.25rem !important;
+    font-size: 1.4rem !important;
     font-weight: 500 !important;
-    width: 40px !important;
-    min-width: 40px !important;
-    height: 40px !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
     padding: 0 !important;
+    margin: 0 !important;
     transition: background 0.15s !important;
     line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
 }
-.upload-plus-btn button:hover { background: var(--border) !important; }
+.upload-plus-btn button:hover,
+.upload-plus-btn label:hover { background: var(--border) !important; }
+.upload-plus-btn .wrap { border: none !important; box-shadow: none !important; }
 
-/* Text input inside bar */
+/* Text input inside bar — Gemini-style: larger, roomier, pill-shaped */
 .chat-input textarea {
     background: transparent !important;
     border: none !important;
     color: var(--text-hi) !important;
-    font-size: 0.92rem !important;
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
     resize: none !important;
     outline: none !important;
     box-shadow: none !important;
-    padding: 9px 4px !important;
-    min-height: 40px !important;
-    max-height: 120px !important;
+    padding: 14px 10px !important;
+    min-height: 56px !important;
+    max-height: 220px !important;
 }
 .chat-input textarea::placeholder { color: var(--text-lo) !important; opacity: 0.7; }
 .chat-input .wrap { border: none !important; box-shadow: none !important; background: transparent !important; }
@@ -540,12 +553,12 @@ _CSS = """
 .send-arrow-btn button {
     background: var(--accent) !important;
     border: none !important;
-    border-radius: 10px !important;
+    border-radius: 12px !important;
     color: var(--accent-fg) !important;
-    font-size: 1.05rem !important;
-    width: 40px !important;
-    min-width: 40px !important;
-    height: 40px !important;
+    font-size: 1.2rem !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
     padding: 0 !important;
     display: flex !important;
     align-items: center !important;
@@ -580,11 +593,85 @@ _CSS = """
     text-align: right;
 }
 
+/* Status line under the Workspace button */
+.workspace-status textarea {
+    background: transparent !important;
+    color: var(--text-lo) !important;
+    border: none !important;
+    font-size: 0.75rem !important;
+    text-align: center !important;
+    padding: 4px 0 0 !important;
+}
+
 /* ── Divider ── */
 .sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0 12px; }
 
-/* ── Workspace accordion (stats / tools) ── */
-.workspace-accordion { border: 1px solid var(--border) !important; border-radius: 14px !important; background: var(--surface) !important; }
+/* ── Workspace launcher button ── */
+.workspace-open-btn button {
+    width: 100% !important;
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-hi) !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    padding: 10px !important;
+    transition: border-color 0.15s, background 0.15s !important;
+}
+.workspace-open-btn button:hover {
+    border-color: var(--accent) !important;
+    background: var(--accent-soft) !important;
+}
+
+/* ── Workspace modal ── */
+.modal-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0,0,0,0.45) !important;
+    z-index: 1000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 24px !important;
+}
+.modal-content {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 18px !important;
+    padding: 20px 22px !important;
+    width: min(560px, 100%) !important;
+    max-height: min(80vh, 700px) !important;
+    overflow-y: auto !important;
+    box-shadow: 0 12px 40px rgba(16,24,40,0.25) !important;
+}
+.modal-content::-webkit-scrollbar { width: 5px; }
+.modal-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.modal-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.modal-title-row h2 {
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--text-hi);
+    margin: 0;
+}
+.modal-close-btn button {
+    background: var(--accent-soft) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    color: var(--text-hi) !important;
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 30px !important;
+    padding: 0 !important;
+    font-size: 1rem !important;
+}
+.modal-close-btn button:hover { background: var(--border) !important; }
+.workspace-accordion { border: 1px solid var(--border) !important; border-radius: 14px !important; background: var(--canvas) !important; margin-top: 8px !important; }
 
 /* ── Footer ── */
 .app-footer {
@@ -611,9 +698,6 @@ _CSS = """
     transition: border-color 0.15s !important;
 }
 .theme-toggle-btn button:hover { border-color: var(--accent) !important; }
-
-/* ── Hidden file input trick ── */
-.hidden-upload { display: none !important; }
 
 /* ── Scrollable sidebar ── */
 .sidebar-scroll {
@@ -645,12 +729,6 @@ async () => {
         }, 50);
     };
 
-    // Wire the + button to click the hidden Gradio file input
-    window.triggerFileUpload = function() {
-        const inp = document.querySelector('#hidden-upload-input input[type=file]');
-        if (inp) inp.click();
-    };
-
     // Restore saved theme preference (falls back to OS preference)
     window.applyTheme = function(mode) {
         document.documentElement.classList.toggle('dark', mode === 'dark');
@@ -674,7 +752,7 @@ async () => {
 # ---------------------------------------------------------------------------
 
 app = gr.Blocks(
-    title="Study Assistant · Deadline Tracker",
+    title="Vortex · Deadline Tracker",
     css=_CSS,
     js=_JS_INIT,
     theme=gr.themes.Base(
@@ -689,16 +767,9 @@ with app:
     with gr.Row(elem_classes=["app-header"]):
         with gr.Column(scale=1):
             gr.HTML("""
-            <h1><span class="accent-dot"></span>Study Assistant</h1>
+            <h1><span class="accent-dot"></span>Vortex</h1>
             <p>Azure OpenAI · MCP tools (filesystem · calculator · weather · deadlines) · Upload a syllabus to auto-track due dates</p>
             """)
-        with gr.Column(scale=0, min_width=44):
-            theme_toggle_btn = gr.Button(
-                "◐",
-                elem_id="theme-toggle-btn",
-                elem_classes=["theme-toggle-btn"],
-                size="sm",
-            )
 
     # ── Two-column layout: chat + right rail ─────────────────────────────────
     with gr.Row(equal_height=False):
@@ -714,25 +785,29 @@ with app:
                 avatar_images=None,
             )
 
-            # ── Input bar ───────────────────────────────────────────────────
+            # ── Input bar (Gemini-style composer) ──────────────────────────
             with gr.Row(elem_classes=["input-row"]):
 
-                # + button (triggers hidden upload)
-                upload_plus_btn = gr.Button(
+                # + button — a real upload control, opens the OS file
+                # picker directly (no hidden-input / JS-click workaround,
+                # which browsers block for hidden file inputs).
+                upload_plus_btn = gr.UploadButton(
                     "+",
+                    file_types=[".txt", ".md", ".pdf"],
                     scale=0,
-                    min_width=40,
+                    min_width=44,
+                    min_height=44,
                     elem_classes=["upload-plus-btn"],
                 )
 
-                # Text input
+                # Text input — bigger, roomier, multi-line like Gemini's box
                 msg = gr.Textbox(
                     placeholder="Message… or ask “what's due this week?”",
                     show_label=False,
                     scale=1,
                     container=False,
-                    lines=1,
-                    max_lines=5,
+                    lines=2,
+                    max_lines=8,
                     elem_classes=["chat-input"],
                 )
 
@@ -740,7 +815,8 @@ with app:
                 submit_btn = gr.Button(
                     "↑",
                     scale=0,
-                    min_width=40,
+                    min_width=44,
+                    min_height=44,
                     elem_classes=["send-arrow-btn"],
                 )
 
@@ -751,13 +827,6 @@ with app:
                     label="MCP tools",
                     value=True,
                     scale=0,
-                )
-                status_text = gr.Textbox(
-                    value="Initializing…",
-                    show_label=False,
-                    interactive=False,
-                    scale=2,
-                    elem_classes=["status-box"],
                 )
 
         # ━━━━━━━━━━━━━━━━ RIGHT: Files + Deadlines ━━━━━━━━━━━━━━━━━━━━━━━━
@@ -770,14 +839,6 @@ with app:
                 elem_classes=["sidebar-panel"],
             )
 
-            # Hidden: file uploader (triggered by + button)
-            hidden_upload = gr.File(
-                label="",
-                file_types=[".txt", ".md", ".pdf"],
-                type="filepath",
-                visible=False,
-                elem_id="hidden-upload-input",
-            )
             # Hidden: upload status fed back to sidebar
             upload_status_md = gr.Markdown(visible=False)
 
@@ -803,31 +864,51 @@ with app:
 
             gr.HTML("<hr class='sidebar-divider'>")
 
-            # ── Workspace (stats / tools / examples), tucked away ─────────────
-            with gr.Accordion("Workspace", open=False, elem_classes=["workspace-accordion"]):
-                stats_display = gr.Markdown(get_stats())
-                refresh_stats_btn = gr.Button("Refresh stats", size="sm")
+            # ── Workspace launcher: opens stats/tools/examples in a dialog
+            #    instead of an inline accordion, so the sidebar stays short
+            #    and the composer never needs a page scroll to reach. ──────
+            workspace_open_btn = gr.Button(
+                "Workspace",
+                elem_classes=["workspace-open-btn"],
+            )
+            status_text = gr.Textbox(
+                value="Initializing…",
+                show_label=False,
+                interactive=False,
+                elem_classes=["workspace-status"],
+            )
 
-                with gr.Accordion("Available tools", open=False):
+        # ── Workspace modal (stats / tools / examples) ────────────────────────
+        with gr.Column(visible=False, elem_classes=["modal-overlay"]) as workspace_modal:
+            with gr.Column(elem_classes=["modal-content"]):
+                with gr.Row(elem_classes=["modal-title-row"]):
+                    gr.HTML("<h2>Workspace</h2>")
+                    workspace_close_btn = gr.Button("✕", elem_classes=["modal-close-btn"], scale=0, min_width=30)
+
+                with gr.Accordion("Stats", open=True, elem_classes=["workspace-accordion"]):
+                    stats_display = gr.Markdown(get_stats())
+                    refresh_stats_btn = gr.Button("Refresh stats", size="sm")
+
+                with gr.Accordion("Available tools", open=False, elem_classes=["workspace-accordion"]):
                     tools_display = gr.Markdown("Loading tools…")
                     refresh_tools_btn = gr.Button("Refresh tools", size="sm")
 
-                with gr.Accordion("Quick examples", open=False):
+                with gr.Accordion("Quick examples", open=False, elem_classes=["workspace-accordion"]):
                     gr.Markdown("""
-**Deadlines**
-- What's due this week?
-- Show all my deadlines
-- Mark Homework 1 as done
+                    **Deadlines**
+                    - What's due this week?
+                    - Show all my deadlines
+                    - Mark Homework 1 as done
 
-**Files (MCP)**
-- List all files · Read test1.txt
+                    **Files (MCP)**
+                    - List all files · Read test1.txt
 
-**Math (MCP)**
-- Add 10, 20, and 30
+                    **Math (MCP)**
+                    - Add 10, 20, and 30
 
-**Weather (MCP)**
-- Weather in London?
-                    """)
+                    **Weather (MCP)**
+                    - Weather in London?
+                                    """)
 
     # ── Footer ───────────────────────────────────────────────────────────────
     gr.HTML(
@@ -861,23 +942,22 @@ with app:
         outputs=[chatbot, status_text],
     )
 
-    # + button → trigger hidden file input via JS
-    upload_plus_btn.click(
-        fn=None,
-        js="() => { window.triggerFileUpload(); }",
-    )
-
-    # Theme toggle button → flip light/dark and persist preference
-    theme_toggle_btn.click(
-        fn=None,
-        js="() => { window.toggleTheme(); }",
-    )
-
-    # When hidden upload receives a file → extract + refresh sidebar + deadline panel
-    hidden_upload.upload(
+    # UploadButton opens the native file picker itself (no JS needed) and
+    # fires .upload with the selected file the moment it's chosen.
+    upload_plus_btn.upload(
         fn=handle_file_upload,
-        inputs=[hidden_upload],
+        inputs=[upload_plus_btn],
         outputs=[files_panel, deadline_panel, upload_status_md],
+    )
+
+    # Workspace button → open modal dialog; close (✕) → hide it again
+    workspace_open_btn.click(
+        fn=lambda: gr.update(visible=True),
+        outputs=[workspace_modal],
+    )
+    workspace_close_btn.click(
+        fn=lambda: gr.update(visible=False),
+        outputs=[workspace_modal],
     )
 
     # JS remove button → remove_index_box changes → remove_trigger_btn fires → Python
